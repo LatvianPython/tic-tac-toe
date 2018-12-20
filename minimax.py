@@ -113,17 +113,26 @@ class TicTacToe:
                 print()
         print()
 
-    def do_ai_move(self):
-        self.current_game_state = self.do_ply(self.current_game_state,
-                                              self.mini_max(self.current_game_state, 0, self.current_player_move)[0])
+    def next_move(self):
+        if self.current_player_move == 1:
+            ply = self.mini_max(self.current_game_state, 0, self.current_player_move)[0]
+        else:
+            ply = 1 << (int(input('enter move 0-8: ')) + self.current_player_move * 9)
+        self.current_game_state = self.do_ply(self.current_game_state, ply)
         self.current_player_move ^= 1
+        self.refresh_board()
+
+    def reset(self):
+        self.current_game_state = 0
+        self.current_player_move = self.player_x
+
 
 
 if __name__ == '__main__':
     playerSide = 0
 
     game = TicTacToe()
-
-    while not game.end_state(game.current_game_state):
-        game.do_ai_move()
-        game.refresh_board()
+    while True:
+        while not game.end_state(game.current_game_state):
+            game.next_move()
+        game.reset()
