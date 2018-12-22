@@ -6,11 +6,19 @@ class TicTacToe:
     player_x = 1
     player_o = 0
 
-    def __init__(self):
+    def __init__(self, ai_only=False):
         self.current_game_state = 0
         self.transposition_table = {}
         self.current_player_move = self.player_x
+        self.ai_only = ai_only
         self.mini_max(self.current_game_state, 0, self.current_player_move)
+
+    @property
+    def game_state(self):
+        return (lambda a: [a[i:i + 3] for i in range(0, len(a), 3)])(
+                [('o' * ((self.current_game_state >> i) & 1) +
+                  'x' * ((self.current_game_state >> i >> 9) & 1)).rjust(1, ' ')
+                 for i in range(9)])
 
     @staticmethod
     def win(game_state):
@@ -47,40 +55,27 @@ class TicTacToe:
         return plies
 
     def mini_max(self, game_state, depth, player):
-
         best_ply = None
 
         if self.end_state(game_state):
             return None, self.evaluation(game_state, depth)
 
         if player == self.player_x:  # X is maximising player
-            best_value = -sys.maxsize - 1
-
-            for ply in self.generate_plies(game_state, self.player_x):
-                next_game_state = self.do_ply(game_state, ply)
-                if next_game_state not in self.transposition_table:
-                    next_ply, next_value = self.mini_max(next_game_state, depth + 1, self.player_o)
-                    self.transposition_table[next_game_state] = next_value
-                else:
-                    next_value = self.transposition_table[next_game_state]
-
-                if next_value > best_value:
-                    best_value = next_value
-                    best_ply = ply
+            best_value, compare = -sys.maxsize - 1, max
         else:
-            best_value = sys.maxsize
+            best_value, compare = sys.maxsize, min
 
-            for ply in self.generate_plies(game_state, self.player_o):
-                next_game_state = self.do_ply(game_state, ply)
-                if next_game_state not in self.transposition_table:
-                    next_ply, next_value = self.mini_max(next_game_state, depth + 1, self.player_x)
-                    self.transposition_table[next_game_state] = next_value
-                else:
-                    next_value = self.transposition_table[next_game_state]
+        for ply in self.generate_plies(game_state, player):
+            next_game_state = self.do_ply(game_state, ply)
+            try:
+                next_value = self.transposition_table[next_game_state]
+            except KeyError:
+                _, next_value = self.mini_max(next_game_state, depth + 1, not player)
+                self.transposition_table[next_game_state] = next_value
 
-                if next_value < best_value:
-                    best_value = next_value
-                    best_ply = ply
+            if compare(next_value, best_value) == next_value:
+                best_value = next_value
+                best_ply = ply
 
         return best_ply, best_value
 
@@ -96,25 +91,53 @@ class TicTacToe:
                 print()
         print()
 
+    @staticmethod
+    def make_move(space, player):
+        return 1 << (space + player * 9)
+
     def next_move(self):
-        if self.current_player_move == self.player_x:
+        if self.ai_only:
             ply = self.mini_max(self.current_game_state, 0, self.current_player_move)[0]
         else:
-            ply = 1 << (int(input('enter move 0-8: ')) + self.current_player_move * 9)
+            if self.current_player_move == self.player_x:
+                ply = self.mini_max(self.current_game_state, 0, self.current_player_move)[0]
+            else:
+                ply = self.make_move(int(input('enter move 1-9: ')) - 1, self.current_player_move)
         self.current_game_state = self.do_ply(self.current_game_state, ply)
         self.current_player_move ^= 1
-        self.refresh_board()
+
+        if not self.ai_only:
+            self.refresh_board()
+
+    def winner(self):
+        if self.win_x(self.current_game_state):
+            return 'X wins'
+        if self.win_o(self.current_game_state):
+            return 'O wins'
+        return 'Draw'
 
     def reset(self):
         self.current_game_state = 0
         self.current_player_move = self.player_x
 
+    def __repr__(self):
+        return '{} ; current move: {}'.format(self.game_state, ('x' if self.current_player_move else 'o'))
+
 
 if __name__ == '__main__':
-    playerSide = 0
 
-    game = TicTacToe()
+    game = TicTacToe(ai_only=True)
+    winners = {}
     while True:
         while not game.end_state(game.current_game_state):
             game.next_move()
+
+        winner = game.winner()
+        try:
+            winners[winner] = winners[winner] + 1
+        except KeyError:
+            winners[winner] = 1
+
+        print(f'\r{winners}', end=('' if game.ai_only else '\n'))
+
         game.reset()
