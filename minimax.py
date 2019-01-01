@@ -17,7 +17,7 @@ class TicTacToe:
     def game_state(self):
         return (lambda a: [a[i:i + 3] for i in range(0, len(a), 3)])(
                 [('o' * ((self.current_game_state >> i) & 1) +
-                  'x' * ((self.current_game_state >> i >> 9) & 1)).rjust(1, ' ')
+                  'x' * ((self.current_game_state >> i >> 9) & 1)).rjust(1, '-')
                  for i in range(9)])
 
     @staticmethod
@@ -45,7 +45,7 @@ class TicTacToe:
         return 0
 
     @staticmethod
-    def do_ply(game_state, ply):
+    def apply_ply(game_state, ply):
         return game_state | ply
 
     @staticmethod
@@ -66,7 +66,7 @@ class TicTacToe:
             best_value, compare = sys.maxsize, min
 
         for ply in self.generate_plies(game_state, player):
-            next_game_state = self.do_ply(game_state, ply)
+            next_game_state = self.apply_ply(game_state, ply)
             try:
                 next_value = self.transposition_table[next_game_state]
             except KeyError:
@@ -74,21 +74,15 @@ class TicTacToe:
                 self.transposition_table[next_game_state] = next_value
 
             if compare(next_value, best_value) == next_value:
-                best_value = next_value
-                best_ply = ply
+                best_value, best_ply = next_value, ply
 
         return best_ply, best_value
 
-    def refresh_board(self):
-        for i in range(9):
-            if (self.current_game_state & (1 << i)) != 0:
-                print('o', end='')
-            elif (self.current_game_state & (1 << (i + 9))) != 0:
-                print('x', end='')
-            else:
-                print('-', end='')
-            if i % 3 == 2:
-                print()
+    def display_game_state(self):
+        for row in self.game_state:
+            for tile in row:
+                print(tile, end='')
+            print()
         print()
 
     @staticmethod
@@ -103,20 +97,20 @@ class TicTacToe:
                 ply = self.mini_max(self.current_game_state, 0, self.current_player_move)[0]
             else:
                 ply = self.make_move(int(input('enter move 1-9: ')) - 1, self.current_player_move)
-        self.current_game_state = self.do_ply(self.current_game_state, ply)
+        self.current_game_state = self.apply_ply(self.current_game_state, ply)
         self.current_player_move ^= 1
 
         if not self.ai_only:
-            self.refresh_board()
+            self.display_game_state()
 
-    def winner(self):
+    def get_winner(self):
         if self.win_x(self.current_game_state):
             return 'X wins'
-        if self.win_o(self.current_game_state):
+        elif self.win_o(self.current_game_state):
             return 'O wins'
         return 'Draw'
 
-    def reset(self):
+    def reset_game(self):
         self.current_game_state = 0
         self.current_player_move = self.player_x
 
@@ -132,7 +126,7 @@ if __name__ == '__main__':
         while not game.end_state(game.current_game_state):
             game.next_move()
 
-        winner = game.winner()
+        winner = game.get_winner()
         try:
             winners[winner] = winners[winner] + 1
         except KeyError:
@@ -140,4 +134,4 @@ if __name__ == '__main__':
 
         print(f'\r{winners}', end=('' if game.ai_only else '\n'))
 
-        game.reset()
+        game.reset_game()
